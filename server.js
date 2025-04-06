@@ -150,11 +150,19 @@ app.post('/api/register', async (req, res) => {
         return res.status(400).json({ message: 'cardID and name are required' });
     }
 
-    const data = { name, email, department, year, section };
+    // Replace undefined values with empty strings
+    const data = {
+        name: name || "",
+        email: email || "",
+        department: department || "",
+        year: year || "",
+        section: section || ""
+    };
 
     await db.collection('Registered Students').doc(cardID).set(data);
     res.json({ message: 'User registered successfully', cardID, ...data });
 });
+
 
 // --- API: Get Present Students ---
 app.get('/api/present', async (req, res) => {
