@@ -41,7 +41,8 @@ function parseTime(str) {
 }
 
 function getMinutesSinceMidnight(date = new Date()) {
-    return date.getHours() * 60 + date.getMinutes();
+    const localDate = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    return localDate.getHours() * 60 + localDate.getMinutes();
 }
 
 // Get attended periods with duration ≥ 10%
