@@ -78,7 +78,7 @@ app.post('/api/rfid', async (req, res) => {
     if (!cardID) return res.status(400).json({ message: 'Invalid request: cardID is required' });
 
     try {
-        const userRef = db.collection('Registered Students').doc(cardID);
+        const userRef = db.collection('registered_students').doc(cardID);
         const userDoc = await userRef.get();
 
         if (!userDoc.exists) {
@@ -159,7 +159,7 @@ app.post('/api/register', async (req, res) => {
         section: section || ""
     };
 
-    await db.collection('Registered Students').doc(cardID).set(data);
+    await db.collection('registered_students').doc(cardID).set(data);
     res.json({ message: 'User registered successfully', cardID, ...data });
 });
 
@@ -174,7 +174,7 @@ app.get('/api/present', async (req, res) => {
 
     for (const doc of snap.docs) {
         const cardID = doc.id;
-        const userDoc = await db.collection('Registered Students').doc(cardID).get();
+        const userDoc = await db.collection('registered_students').doc(cardID).get();
         const name = userDoc.exists ? userDoc.data().name : 'Unknown';
         result.push({ cardID, name, ...doc.data() });
     }
@@ -184,7 +184,7 @@ app.get('/api/present', async (req, res) => {
 
 // --- API: Get All Registered Users ---
 app.get('/api/registered', async (req, res) => {
-    const snap = await db.collection('Registered Students').get();
+    const snap = await db.collection('registered_students').get();
     const users = snap.docs.map(doc => ({ cardID: doc.id, ...doc.data() }));
     res.json(users);
 });
@@ -194,7 +194,7 @@ app.get('/api/status/:cardID', async (req, res) => {
     const { cardID } = req.params;
     const dateKey = getTodayDateString();
 
-    const userDoc = await db.collection('Registered Students').doc(cardID).get();
+    const userDoc = await db.collection('registered_students').doc(cardID).get();
     if (!userDoc.exists) return res.status(404).json({ message: 'not registered' });
 
     const attendanceDoc = await db.collection('attendance').doc(dateKey).collection('records').doc(cardID).get();
