@@ -31,8 +31,13 @@ const PERIODS = {
 };
 
 // --- Helpers ---
+function getISTDate(date = new Date()) {
+    return new Date(date.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+}
+
 function getTodayDateString() {
-    return new Date().toISOString().split('T')[0];
+    const istNow = getISTDate();
+    return istNow.toISOString().split('T')[0];
 }
 
 function parseTime(str) {
@@ -41,7 +46,7 @@ function parseTime(str) {
 }
 
 function getMinutesSinceMidnight(date = new Date()) {
-    const localDate = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const localDate = getISTDate(date);
     return localDate.getHours() * 60 + localDate.getMinutes();
 }
 
@@ -71,7 +76,7 @@ function getPresentPeriods(entryDate, exitDate) {
 // --- API: RFID Scan ---
 app.post('/api/rfid', async (req, res) => {
     const { cardID } = req.body;
-    const now = new Date();
+    const now = getISTDate();
     const timestamp = now.toISOString();
     const dateKey = getTodayDateString();
 
@@ -136,7 +141,7 @@ app.post('/api/rfid', async (req, res) => {
         return res.status(500).json({
             message: 'error',
             name: null,
-            time: new Date().toISOString(),
+            time: getISTDate().toISOString(),
             errorDetails: err.message
         });
     }
@@ -150,7 +155,6 @@ app.post('/api/register', async (req, res) => {
         return res.status(400).json({ message: 'cardID and name are required' });
     }
 
-    // Replace undefined values with empty strings
     const data = {
         name: name || "",
         email: email || "",
@@ -162,7 +166,6 @@ app.post('/api/register', async (req, res) => {
     await db.collection('registered_students').doc(cardID).set(data);
     res.json({ message: 'User registered successfully', cardID, ...data });
 });
-
 
 // --- API: Get Present Students ---
 app.get('/api/present', async (req, res) => {
