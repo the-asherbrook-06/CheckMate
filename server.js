@@ -50,6 +50,20 @@ function getMinutesSinceMidnight(date = new Date()) {
     return localDate.getHours() * 60 + localDate.getMinutes();
 }
 
+// Handle cases where entry is before midnight and exit after midnight
+function adjustForCrossMidnight(entryTime, exitTime) {
+    const entryDate = new Date(entryTime);
+    const exitDate = new Date(exitTime);
+
+    // Check if exit time is after midnight and entry time is before midnight
+    if (exitDate < entryDate) {
+        // Adjust exit date to be the next day if it crossed midnight
+        exitDate.setDate(exitDate.getDate() + 1);
+    }
+
+    return { entryDate, exitDate };
+}
+
 // Get attended periods with duration ≥ 10%
 function getPresentPeriods(entryDate, exitDate) {
     const entryMin = getMinutesSinceMidnight(entryDate);
@@ -112,7 +126,9 @@ app.post('/api/rfid', async (req, res) => {
             const entryTime = new Date(recordDoc.data().entryTime);
             const exitTime = now;
 
-            const newPeriods = getPresentPeriods(entryTime, exitTime);
+            const { entryDate, exitDate } = adjustForCrossMidnight(entryTime, exitTime);
+
+            const newPeriods = getPresentPeriods(entryDate, exitDate);
             const existing = recordDoc.data().periods || {};
             const mergedPeriods = { ...existing };
 
