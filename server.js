@@ -70,16 +70,19 @@ app.post('/api/rfid', async (req, res) => {
     } else {
         // Exit
         const entryTime = todayDoc.data().entryTime.toDate();
-        const durationMinutes = Math.floor((now - entryTime) / 60000);
         const periodsToUpdate = {};
 
         for (const [period, [start, end]] of Object.entries(PERIODS)) {
             const [startHour, startMinute] = start.split(':').map(Number);
             const [endHour, endMinute] = end.split(':').map(Number);
+
             const periodStart = new Date(now);
             periodStart.setHours(startHour, startMinute, 0, 0);
             const periodEnd = new Date(now);
             periodEnd.setHours(endHour, endMinute, 0, 0);
+
+            // 🚫 Skip periods that ended before entry
+            if (periodEnd <= entryTime) continue;
 
             const overlapStart = Math.max(entryTime.getTime(), periodStart.getTime());
             const overlapEnd = Math.min(now.getTime(), periodEnd.getTime());
