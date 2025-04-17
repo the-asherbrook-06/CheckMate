@@ -76,9 +76,11 @@ app.post('/api/rfid', async (req, res) => {
             const [startHour, startMinute] = start.split(':').map(Number);
             const [endHour, endMinute] = end.split(':').map(Number);
 
-            const periodStart = new Date(now);
+            // ⏰ Use entryTime's date to anchor period times
+            const periodStart = new Date(entryTime);
             periodStart.setHours(startHour, startMinute, 0, 0);
-            const periodEnd = new Date(now);
+
+            const periodEnd = new Date(entryTime);
             periodEnd.setHours(endHour, endMinute, 0, 0);
 
             // 🚫 Skip periods that ended before entry
