@@ -30,7 +30,14 @@ const PERIODS = {
     Hour7: ['15:20', '16:10']
 };
 
-// --- RFID Endpoint ---
+// Helper function to get the UTC time for a given hour and minute
+function getUTCDate(date, hours, minutes) {
+    const utc = new Date(date.getTime());
+    utc.setUTCHours(hours, minutes, 0, 0);  // Set UTC time (no time zone conversion)
+    return utc;
+}
+
+// --- API Endpoint ---
 app.post('/api/rfid', async (req, res) => {
     const { cardID } = req.body;
     if (!cardID) return res.status(400).json({ message: 'cardID is required' });
@@ -44,11 +51,11 @@ app.post('/api/rfid', async (req, res) => {
 
     const studentData = studentDoc.data();
     const now = new Date();
-    const today = now.toISOString().split('T')[0];
+    const today = now.toISOString().split('T')[0];  // Get current date in UTC (yyyy-mm-dd)
     const todayRef = db.collection('attendance').doc(today).collection('records').doc(cardID);
     const todayDoc = await todayRef.get();
 
-    const timestamp = admin.firestore.Timestamp.fromDate(now);
+    const timestamp = admin.firestore.Timestamp.fromDate(now);  // UTC timestamp
 
     if (!todayDoc.exists || !todayDoc.data().checkedIn) {
         // Entry
@@ -62,28 +69,25 @@ app.post('/api/rfid', async (req, res) => {
 
         await todayRef.set({
             checkedIn: true,
-            entryTime: timestamp,
+            entryTime: timestamp,  // Save UTC entry time
             periods: periodsData
         }, { merge: true });
 
         return res.json({ message: 'entered', name: studentData.name, time: timestamp });
     } else {
         // Exit
-        const entryTime = todayDoc.data().entryTime.toDate();
+        const entryTime = todayDoc.data().entryTime.toDate();  // UTC entry time
         const periodsToUpdate = {};
 
         for (const [period, [start, end]] of Object.entries(PERIODS)) {
             const [startHour, startMinute] = start.split(':').map(Number);
             const [endHour, endMinute] = end.split(':').map(Number);
 
-            // ⏰ Use entryTime's date to anchor period times
-            const periodStart = new Date(entryTime);
-            periodStart.setHours(startHour, startMinute, 0, 0);
+            // Get the UTC times for the period based on entryTime (anchor the period to entry's date in UTC)
+            const periodStart = getUTCDate(entryTime, startHour, startMinute);
+            const periodEnd = getUTCDate(entryTime, endHour, endMinute);
 
-            const periodEnd = new Date(entryTime);
-            periodEnd.setHours(endHour, endMinute, 0, 0);
-
-            // 🚫 Skip periods that ended before entry
+            // Skip periods that ended before entry time
             if (periodEnd <= entryTime) continue;
 
             const overlapStart = Math.max(entryTime.getTime(), periodStart.getTime());
@@ -102,7 +106,7 @@ app.post('/api/rfid', async (req, res) => {
 
         await todayRef.update({
             checkedIn: false,
-            exitTime: timestamp,
+            exitTime: timestamp,  // Save UTC exit time
             ...periodsToUpdate
         });
 
@@ -110,18 +114,7 @@ app.post('/api/rfid', async (req, res) => {
     }
 });
 
-app.get('/api/time-diff', (req, res) => {
-    const now = new Date();
-    const offset = now.getTimezoneOffset();  // Offset in minutes from UTC (e.g., +330 for IST)
-
-    res.json({
-        serverTime: now.toISOString(),  // Current server time in ISO format
-        utcOffset: offset  // UTC offset in minutes
-    });
-});
-
-
-// --- Server Listen ---
+// Start the server
 app.listen(PORT, () => {
-    console.log(`🎉 Server is running on http://localhost:${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
 });
