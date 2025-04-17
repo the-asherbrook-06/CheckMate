@@ -31,26 +31,32 @@ const PERIODS = {
 };
 
 // --- Helpers ---
-function getISTDate(date = new Date()) {
-    const istString = date.toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
-    return new Date(istString);
+
+// Convert UTC date to IST
+function toIST(date = new Date()) {
+    const offsetMs = 5.5 * 60 * 60 * 1000; // IST offset in ms
+    return new Date(date.getTime() + offsetMs);
 }
 
+// Return today's date in YYYY-MM-DD based on IST
 function getTodayDateString() {
-    const istNow = getISTDate();
-    return istNow.toISOString().split('T')[0];
+    const istDate = toIST();
+    return istDate.toISOString().split('T')[0];
 }
 
+// Parse "HH:mm" to minutes since midnight
 function parseTime(str) {
     const [h, m] = str.split(':').map(Number);
     return h * 60 + m;
 }
 
+// Get minutes since midnight in IST
 function getMinutesSinceMidnight(date = new Date()) {
-    const localDate = getISTDate(date);
+    const localDate = toIST(date);
     return localDate.getHours() * 60 + localDate.getMinutes();
 }
 
+// Get attended periods where overlap ≥ 10%
 function getPresentPeriods(entryDate, exitDate) {
     const entryMin = getMinutesSinceMidnight(entryDate);
     const exitMin = getMinutesSinceMidnight(exitDate);
@@ -76,9 +82,8 @@ function getPresentPeriods(entryDate, exitDate) {
 // --- API: RFID Scan ---
 app.post('/api/rfid', async (req, res) => {
     const { cardID } = req.body;
-    const now = new Date();
-    const istNow = getISTDate(now);
-    const timestamp = istNow.toISOString();
+    const now = new Date(); // Keep this in UTC
+    const timestamp = now.toISOString();
     const dateKey = getTodayDateString();
 
     if (!cardID) return res.status(400).json({ message: 'Invalid request: cardID is required' });
@@ -142,7 +147,7 @@ app.post('/api/rfid', async (req, res) => {
         return res.status(500).json({
             message: 'error',
             name: null,
-            time: getISTDate().toISOString(),
+            time: new Date().toISOString(),
             errorDetails: err.message
         });
     }
