@@ -113,12 +113,12 @@ app.post('/api/rfid', async (req, res) => {
             if (overlapEnd > overlapStart) {
                 const overlapMinutes = Math.floor((overlapEnd - overlapStart) / 60000);
                 const prev = todayDoc.data().periods?.[period] || { duration: 0, present: false };
-
+            
                 periodsToUpdate[`periods.${period}`] = {
                     duration: prev.duration + overlapMinutes,
-                    present: prev.present || overlapMinutes >= 10 // ✅ 10 min threshold
+                    present: overlapMinutes >= 10 // ✅ True only if this session’s overlap ≥ 10min
                 };
-            }
+            }            
         }
 
         await todayRef.update({
