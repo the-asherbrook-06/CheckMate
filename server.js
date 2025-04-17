@@ -32,8 +32,8 @@ const PERIODS = {
 
 // --- Helpers ---
 function getISTDate(date = new Date()) {
-    const istOffset = 5.5 * 60 * 60 * 1000; // 5 hours 30 mins in milliseconds
-    return new Date(date.getTime() + istOffset);
+    const istString = date.toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+    return new Date(istString);
 }
 
 function getTodayDateString() {
@@ -51,7 +51,6 @@ function getMinutesSinceMidnight(date = new Date()) {
     return localDate.getHours() * 60 + localDate.getMinutes();
 }
 
-// Get attended periods with duration ≥ 10%
 function getPresentPeriods(entryDate, exitDate) {
     const entryMin = getMinutesSinceMidnight(entryDate);
     const exitMin = getMinutesSinceMidnight(exitDate);
@@ -77,8 +76,9 @@ function getPresentPeriods(entryDate, exitDate) {
 // --- API: RFID Scan ---
 app.post('/api/rfid', async (req, res) => {
     const { cardID } = req.body;
-    const now = getISTDate();
-    const timestamp = now.toISOString();
+    const now = new Date();
+    const istNow = getISTDate(now);
+    const timestamp = istNow.toISOString();
     const dateKey = getTodayDateString();
 
     if (!cardID) return res.status(400).json({ message: 'Invalid request: cardID is required' });
