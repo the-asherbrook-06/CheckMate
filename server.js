@@ -76,8 +76,8 @@ app.post('/api/rfid', async (req, res) => {
 
     const timestamp = admin.firestore.Timestamp.fromDate(now);
 
-    if (!todayDoc.exists || !todayDoc.data().checkedIn) {
-        // Entry
+    if (!todayDoc.exists) {
+        // First ever entry for the day
         const periodsData = {};
         for (const period of Object.keys(PERIODS)) {
             periodsData[period] = {
@@ -90,12 +90,24 @@ app.post('/api/rfid', async (req, res) => {
             checkedIn: true,
             entryTime: timestamp,
             periods: periodsData
-        }, { merge: true });
+        });
+
+        return res.json({ message: 'entered', name: studentData.name, time: timestamp });
+    }
+
+    const todayData = todayDoc.data();
+
+    if (!todayData.checkedIn) {
+        // Re-entry: don't overwrite periods, just update checkedIn and entryTime
+        await todayRef.update({
+            checkedIn: true,
+            entryTime: timestamp
+        });
 
         return res.json({ message: 'entered', name: studentData.name, time: timestamp });
     } else {
-        // Exit
-        const entryTime = todayDoc.data().entryTime.toDate(); // UTC
+        // Exit logic
+        const entryTime = todayData.entryTime.toDate(); // UTC
         const periodsToUpdate = {};
 
         for (const [period, [start, end]] of Object.entries(PERIODS)) {
@@ -115,12 +127,12 @@ app.post('/api/rfid', async (req, res) => {
 
             if (overlapEnd > overlapStart) {
                 const overlapMinutes = Math.floor((overlapEnd - overlapStart) / 60000);
-                const prev = todayDoc.data().periods?.[period] || { duration: 0, present: false };
+                const prev = todayData.periods?.[period] || { duration: 0, present: false };
                 const updatedDuration = prev.duration + overlapMinutes;
 
                 periodsToUpdate[`periods.${period}`] = {
                     duration: updatedDuration,
-                    present: updatedDuration >= 10 // ✅ present only if total ≥ 10
+                    present: updatedDuration >= 10
                 };
             }
         }
