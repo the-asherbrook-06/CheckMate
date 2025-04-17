@@ -69,12 +69,12 @@ app.post('/api/rfid', async (req, res) => {
     }
 
     const studentData = studentDoc.data();
-    const now = new Date();
-    const today = now.toISOString().split('T')[0]; // UTC date string
+    const now = new Date(); // UTC
+    const today = now.toISOString().split('T')[0];
     const todayRef = db.collection('attendance').doc(today).collection('records').doc(cardID);
     const todayDoc = await todayRef.get();
 
-    const timestamp = admin.firestore.Timestamp.fromDate(now); // Current UTC timestamp
+    const timestamp = admin.firestore.Timestamp.fromDate(now);
 
     if (!todayDoc.exists || !todayDoc.data().checkedIn) {
         // Entry
@@ -102,8 +102,11 @@ app.post('/api/rfid', async (req, res) => {
             const [startHour, startMinute] = start.split(':').map(Number);
             const [endHour, endMinute] = end.split(':').map(Number);
 
-            const periodStart = getUTCDate(entryTime, startHour, startMinute);
-            const periodEnd = getUTCDate(entryTime, endHour, endMinute);
+            const periodStart = new Date(entryTime);
+            periodStart.setUTCHours(startHour - 5, startMinute - 30, 0, 0); // Convert IST to UTC
+
+            const periodEnd = new Date(entryTime);
+            periodEnd.setUTCHours(endHour - 5, endMinute - 30, 0, 0); // Convert IST to UTC
 
             if (periodEnd <= entryTime) continue;
 
@@ -113,12 +116,13 @@ app.post('/api/rfid', async (req, res) => {
             if (overlapEnd > overlapStart) {
                 const overlapMinutes = Math.floor((overlapEnd - overlapStart) / 60000);
                 const prev = todayDoc.data().periods?.[period] || { duration: 0, present: false };
-            
+                const updatedDuration = prev.duration + overlapMinutes;
+
                 periodsToUpdate[`periods.${period}`] = {
-                    duration: prev.duration + overlapMinutes,
-                    present: overlapMinutes >= 10 // ✅ True only if this session’s overlap ≥ 10min
+                    duration: updatedDuration,
+                    present: updatedDuration >= 10 // ✅ present only if total ≥ 10
                 };
-            }            
+            }
         }
 
         await todayRef.update({
