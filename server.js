@@ -17,9 +17,9 @@ const PORT = 10000;
 app.use(bodyParser.json());
 app.use(cors());
 
-// --- Periods ---
+// --- Periods --- (times are in IST, we will convert them to UTC)
 const PERIODS = {
-    Hour1: ['08:40', '09:40'],
+    Hour1: ['08:40', '09:40'],  // IST times
     Hour2: ['09:40', '10:40'],
     Break: ['10:40', '11:00'],
     Hour3: ['11:00', '12:00'],
@@ -30,11 +30,30 @@ const PERIODS = {
     Hour7: ['15:20', '16:10']
 };
 
-// Helper function to get the UTC time for a given hour and minute
+// Helper function to convert IST to UTC (subtract 5 hours 30 minutes)
+function convertISTToUTC(hours, minutes) {
+    const date = new Date();
+    // Set the date to 1970-01-01 to focus only on the time part
+    date.setFullYear(1970, 0, 1);  
+    date.setHours(hours);
+    date.setMinutes(minutes);
+    date.setSeconds(0);
+    date.setMilliseconds(0);
+
+    // Subtract 5 hours and 30 minutes to convert from IST to UTC
+    date.setHours(date.getHours() - 5);
+    date.setMinutes(date.getMinutes() - 30);
+
+    return date;
+}
+
+// Helper function to get UTC date for the specific period time
 function getUTCDate(date, hours, minutes) {
-    const utc = new Date(date.getTime());
-    utc.setUTCHours(hours, minutes, 0, 0);  // Set UTC time (no time zone conversion)
-    return utc;
+    const utcDate = new Date(date.getTime());
+    const periodTime = convertISTToUTC(hours, minutes);
+
+    utcDate.setUTCHours(periodTime.getHours(), periodTime.getMinutes(), 0, 0);
+    return utcDate;
 }
 
 // --- API Endpoint ---
