@@ -45,7 +45,7 @@ function getMinutesSinceMidnight(date = new Date()) {
     return localDate.getHours() * 60 + localDate.getMinutes();
 }
 
-// Get attended periods with duration ≥ 10%
+// Get attended periods with duration ≥ 10 minutes
 function getPresentPeriods(entryDate, exitDate) {
     const entryMin = getMinutesSinceMidnight(entryDate);
     const exitMin = getMinutesSinceMidnight(exitDate);
@@ -54,13 +54,11 @@ function getPresentPeriods(entryDate, exitDate) {
     for (const [period, [start, end]] of Object.entries(PERIODS)) {
         const startMin = parseTime(start);
         const endMin = parseTime(end);
-        const periodDuration = endMin - startMin;
-
         const overlapStart = Math.max(entryMin, startMin);
         const overlapEnd = Math.min(exitMin, endMin);
         const overlap = Math.max(0, overlapEnd - overlapStart);
 
-        if ((overlap / periodDuration) * 100 >= 10) {
+        if (overlap >= 10) {
             results[period] = { present: true, duration: overlap };
         }
     }
@@ -150,7 +148,6 @@ app.post('/api/register', async (req, res) => {
         return res.status(400).json({ message: 'cardID and name are required' });
     }
 
-    // Replace undefined values with empty strings
     const data = {
         name: name || "",
         email: email || "",
@@ -162,7 +159,6 @@ app.post('/api/register', async (req, res) => {
     await db.collection('registered_students').doc(cardID).set(data);
     res.json({ message: 'User registered successfully', cardID, ...data });
 });
-
 
 // --- API: Get Present Students ---
 app.get('/api/present', async (req, res) => {
@@ -213,5 +209,5 @@ app.get('/api/status/:cardID', async (req, res) => {
 
 // --- Start Server ---
 app.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
+    console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
