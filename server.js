@@ -31,32 +31,21 @@ const PERIODS = {
 };
 
 // --- Helpers ---
-
-// Convert UTC date to IST
-function toIST(date = new Date()) {
-    const offsetMs = 5.5 * 60 * 60 * 1000; // IST offset in ms
-    return new Date(date.getTime() + offsetMs);
-}
-
-// Return today's date in YYYY-MM-DD based on IST
 function getTodayDateString() {
-    const istDate = toIST();
-    return istDate.toISOString().split('T')[0];
+    return new Date().toISOString().split('T')[0];
 }
 
-// Parse "HH:mm" to minutes since midnight
 function parseTime(str) {
     const [h, m] = str.split(':').map(Number);
     return h * 60 + m;
 }
 
-// Get minutes since midnight in IST
 function getMinutesSinceMidnight(date = new Date()) {
-    const localDate = toIST(date);
+    const localDate = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
     return localDate.getHours() * 60 + localDate.getMinutes();
 }
 
-// Get attended periods where overlap ≥ 10%
+// Get attended periods with duration ≥ 10%
 function getPresentPeriods(entryDate, exitDate) {
     const entryMin = getMinutesSinceMidnight(entryDate);
     const exitMin = getMinutesSinceMidnight(exitDate);
@@ -82,7 +71,7 @@ function getPresentPeriods(entryDate, exitDate) {
 // --- API: RFID Scan ---
 app.post('/api/rfid', async (req, res) => {
     const { cardID } = req.body;
-    const now = new Date(); // Keep this in UTC
+    const now = new Date();
     const timestamp = now.toISOString();
     const dateKey = getTodayDateString();
 
@@ -161,6 +150,7 @@ app.post('/api/register', async (req, res) => {
         return res.status(400).json({ message: 'cardID and name are required' });
     }
 
+    // Replace undefined values with empty strings
     const data = {
         name: name || "",
         email: email || "",
@@ -172,6 +162,7 @@ app.post('/api/register', async (req, res) => {
     await db.collection('registered_students').doc(cardID).set(data);
     res.json({ message: 'User registered successfully', cardID, ...data });
 });
+
 
 // --- API: Get Present Students ---
 app.get('/api/present', async (req, res) => {
@@ -222,5 +213,5 @@ app.get('/api/status/:cardID', async (req, res) => {
 
 // --- Start Server ---
 app.listen(PORT, () => {
-    console.log(`🚀 Server running at http://localhost:${PORT}`);
+    console.log(`Server running at http://localhost:${PORT}`);
 });
