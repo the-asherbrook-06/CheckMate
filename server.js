@@ -31,8 +31,10 @@ const PERIODS = {
 };
 
 // --- Helpers ---
-function getISTDate(date = new Date()) {
-    return new Date(date.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+function getISTDate() {
+    const nowUTC = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000; // 5 hours 30 mins in milliseconds
+    return new Date(nowUTC.getTime() + istOffset);
 }
 
 function getTodayDateString() {
@@ -50,7 +52,6 @@ function getMinutesSinceMidnight(date = new Date()) {
     return localDate.getHours() * 60 + localDate.getMinutes();
 }
 
-// Get attended periods with duration ≥ 10%
 function getPresentPeriods(entryDate, exitDate) {
     const entryMin = getMinutesSinceMidnight(entryDate);
     const exitMin = getMinutesSinceMidnight(exitDate);
@@ -216,5 +217,5 @@ app.get('/api/status/:cardID', async (req, res) => {
 
 // --- Start Server ---
 app.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
+    console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
