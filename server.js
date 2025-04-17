@@ -70,11 +70,11 @@ app.post('/api/rfid', async (req, res) => {
 
     const studentData = studentDoc.data();
     const now = new Date();
-    const today = now.toISOString().split('T')[0];  // Get current date in UTC (yyyy-mm-dd)
+    const today = now.toISOString().split('T')[0]; // UTC date string
     const todayRef = db.collection('attendance').doc(today).collection('records').doc(cardID);
     const todayDoc = await todayRef.get();
 
-    const timestamp = admin.firestore.Timestamp.fromDate(now);  // UTC timestamp
+    const timestamp = admin.firestore.Timestamp.fromDate(now); // Current UTC timestamp
 
     if (!todayDoc.exists || !todayDoc.data().checkedIn) {
         // Entry
@@ -88,25 +88,23 @@ app.post('/api/rfid', async (req, res) => {
 
         await todayRef.set({
             checkedIn: true,
-            entryTime: timestamp,  // Save UTC entry time
+            entryTime: timestamp,
             periods: periodsData
         }, { merge: true });
 
         return res.json({ message: 'entered', name: studentData.name, time: timestamp });
     } else {
         // Exit
-        const entryTime = todayDoc.data().entryTime.toDate();  // UTC entry time
+        const entryTime = todayDoc.data().entryTime.toDate(); // UTC
         const periodsToUpdate = {};
 
         for (const [period, [start, end]] of Object.entries(PERIODS)) {
             const [startHour, startMinute] = start.split(':').map(Number);
             const [endHour, endMinute] = end.split(':').map(Number);
 
-            // Get the UTC times for the period based on entryTime (anchor the period to entry's date in UTC)
             const periodStart = getUTCDate(entryTime, startHour, startMinute);
             const periodEnd = getUTCDate(entryTime, endHour, endMinute);
 
-            // Skip periods that ended before entry time
             if (periodEnd <= entryTime) continue;
 
             const overlapStart = Math.max(entryTime.getTime(), periodStart.getTime());
@@ -118,14 +116,14 @@ app.post('/api/rfid', async (req, res) => {
 
                 periodsToUpdate[`periods.${period}`] = {
                     duration: prev.duration + overlapMinutes,
-                    present: true
+                    present: prev.present || overlapMinutes >= 10 // ✅ 10 min threshold
                 };
             }
         }
 
         await todayRef.update({
             checkedIn: false,
-            exitTime: timestamp,  // Save UTC exit time
+            exitTime: timestamp,
             ...periodsToUpdate
         });
 
