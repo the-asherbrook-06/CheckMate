@@ -110,6 +110,17 @@ app.post('/api/rfid', async (req, res) => {
     }
 });
 
+app.get('/api/time-diff', (req, res) => {
+    const now = new Date();
+    const offset = now.getTimezoneOffset();  // Offset in minutes from UTC (e.g., +330 for IST)
+
+    res.json({
+        serverTime: now.toISOString(),  // Current server time in ISO format
+        utcOffset: offset  // UTC offset in minutes
+    });
+});
+
+
 // --- Server Listen ---
 app.listen(PORT, () => {
     console.log(`🎉 Server is running on http://localhost:${PORT}`);
