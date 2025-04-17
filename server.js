@@ -30,184 +30,82 @@ const PERIODS = {
     Hour7: ['15:20', '16:10']
 };
 
-// --- Helpers ---
-function getTodayDateString() {
-    return new Date().toISOString().split('T')[0];
-}
-
-function parseTime(str) {
-    const [h, m] = str.split(':').map(Number);
-    return h * 60 + m;
-}
-
-function getMinutesSinceMidnight(date = new Date()) {
-    const localDate = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    return localDate.getHours() * 60 + localDate.getMinutes();
-}
-
-// Get attended periods with duration ≥ 10 minutes
-function getPresentPeriods(entryDate, exitDate) {
-    const entryMin = getMinutesSinceMidnight(entryDate);
-    const exitMin = getMinutesSinceMidnight(exitDate);
-    const results = {};
-
-    for (const [period, [start, end]] of Object.entries(PERIODS)) {
-        const startMin = parseTime(start);
-        const endMin = parseTime(end);
-        const overlapStart = Math.max(entryMin, startMin);
-        const overlapEnd = Math.min(exitMin, endMin);
-        const overlap = Math.max(0, overlapEnd - overlapStart);
-
-        if (overlap >= 10) {
-            results[period] = { present: true, duration: overlap };
-        }
-    }
-
-    return results;
-}
-
-// --- API: RFID Scan ---
+// --- RFID Endpoint ---
 app.post('/api/rfid', async (req, res) => {
     const { cardID } = req.body;
+    if (!cardID) return res.status(400).json({ message: 'cardID is required' });
+
+    const studentRef = db.collection('registered_students').doc(cardID);
+    const studentDoc = await studentRef.get();
+
+    if (!studentDoc.exists) {
+        return res.status(404).json({ message: 'not registered', cardID });
+    }
+
+    const studentData = studentDoc.data();
     const now = new Date();
-    const timestamp = now.toISOString();
-    const dateKey = getTodayDateString();
+    const today = now.toISOString().split('T')[0];
+    const todayRef = db.collection('attendance').doc(today).collection('records').doc(cardID);
+    const todayDoc = await todayRef.get();
 
-    if (!cardID) return res.status(400).json({ message: 'Invalid request: cardID is required' });
+    const timestamp = admin.firestore.Timestamp.fromDate(now);
 
-    try {
-        const userRef = db.collection('registered_students').doc(cardID);
-        const userDoc = await userRef.get();
-
-        if (!userDoc.exists) {
-            return res.status(404).json({ message: 'not registered', cardID });
+    if (!todayDoc.exists || !todayDoc.data().checkedIn) {
+        // Entry
+        const periodsData = {};
+        for (const period of Object.keys(PERIODS)) {
+            periodsData[period] = {
+                duration: 0,
+                present: false
+            };
         }
 
-        const user = userDoc.data();
-        const name = user.name || 'Unknown';
+        await todayRef.set({
+            checkedIn: true,
+            entryTime: timestamp,
+            periods: periodsData
+        }, { merge: true });
 
-        const recordRef = db.collection('attendance').doc(dateKey).collection('records').doc(cardID);
-        const recordDoc = await recordRef.get();
+        return res.json({ message: 'entered', name: studentData.name, time: timestamp });
+    } else {
+        // Exit
+        const entryTime = todayDoc.data().entryTime.toDate();
+        const durationMinutes = Math.floor((now - entryTime) / 60000);
+        const periodsToUpdate = {};
 
-        if (!recordDoc.exists || !recordDoc.data().checkedIn) {
-            await recordRef.set({
-                entryTime: timestamp,
-                exitTime: null,
-                checkedIn: true
-            }, { merge: true });
+        for (const [period, [start, end]] of Object.entries(PERIODS)) {
+            const [startHour, startMinute] = start.split(':').map(Number);
+            const [endHour, endMinute] = end.split(':').map(Number);
+            const periodStart = new Date(now);
+            periodStart.setHours(startHour, startMinute, 0, 0);
+            const periodEnd = new Date(now);
+            periodEnd.setHours(endHour, endMinute, 0, 0);
 
-            return res.json({
-                message: 'entered',
-                name,
-                time: timestamp
-            });
-        } else {
-            const entryTime = new Date(recordDoc.data().entryTime);
-            const exitTime = now;
+            const overlapStart = Math.max(entryTime.getTime(), periodStart.getTime());
+            const overlapEnd = Math.min(now.getTime(), periodEnd.getTime());
 
-            const newPeriods = getPresentPeriods(entryTime, exitTime);
-            const existing = recordDoc.data().periods || {};
-            const mergedPeriods = { ...existing };
+            if (overlapEnd > overlapStart) {
+                const overlapMinutes = Math.floor((overlapEnd - overlapStart) / 60000);
+                const prev = todayDoc.data().periods?.[period] || { duration: 0, present: false };
 
-            for (const period of Object.keys(newPeriods)) {
-                if (mergedPeriods[period]) {
-                    mergedPeriods[period].duration += newPeriods[period].duration;
-                } else {
-                    mergedPeriods[period] = newPeriods[period];
-                }
+                periodsToUpdate[`periods.${period}`] = {
+                    duration: prev.duration + overlapMinutes,
+                    present: true
+                };
             }
-
-            await recordRef.set({
-                exitTime: timestamp,
-                checkedIn: false,
-                periods: mergedPeriods
-            }, { merge: true });
-
-            return res.json({
-                message: 'exited',
-                name,
-                time: timestamp
-            });
         }
 
-    } catch (err) {
-        return res.status(500).json({
-            message: 'error',
-            name: null,
-            time: new Date().toISOString(),
-            errorDetails: err.message
+        await todayRef.update({
+            checkedIn: false,
+            exitTime: timestamp,
+            ...periodsToUpdate
         });
+
+        return res.json({ message: 'exited', name: studentData.name, time: timestamp });
     }
 });
 
-// --- API: Register Student ---
-app.post('/api/register', async (req, res) => {
-    const { cardID, name, email, department, year, section } = req.body;
-
-    if (!cardID || !name) {
-        return res.status(400).json({ message: 'cardID and name are required' });
-    }
-
-    const data = {
-        name: name || "",
-        email: email || "",
-        department: department || "",
-        year: year || "",
-        section: section || ""
-    };
-
-    await db.collection('registered_students').doc(cardID).set(data);
-    res.json({ message: 'User registered successfully', cardID, ...data });
-});
-
-// --- API: Get Present Students ---
-app.get('/api/present', async (req, res) => {
-    const dateKey = getTodayDateString();
-    const snap = await db.collection('attendance').doc(dateKey).collection('records')
-        .where('checkedIn', '==', true).get();
-
-    const result = [];
-
-    for (const doc of snap.docs) {
-        const cardID = doc.id;
-        const userDoc = await db.collection('registered_students').doc(cardID).get();
-        const name = userDoc.exists ? userDoc.data().name : 'Unknown';
-        result.push({ cardID, name, ...doc.data() });
-    }
-
-    res.json(result);
-});
-
-// --- API: Get All Registered Users ---
-app.get('/api/registered', async (req, res) => {
-    const snap = await db.collection('registered_students').get();
-    const users = snap.docs.map(doc => ({ cardID: doc.id, ...doc.data() }));
-    res.json(users);
-});
-
-// --- API: Status by cardID ---
-app.get('/api/status/:cardID', async (req, res) => {
-    const { cardID } = req.params;
-    const dateKey = getTodayDateString();
-
-    const userDoc = await db.collection('registered_students').doc(cardID).get();
-    if (!userDoc.exists) return res.status(404).json({ message: 'not registered' });
-
-    const attendanceDoc = await db.collection('attendance').doc(dateKey).collection('records').doc(cardID).get();
-    if (!attendanceDoc.exists) {
-        return res.json({
-            name: userDoc.data().name,
-            status: 'Not checked in today'
-        });
-    }
-
-    res.json({
-        name: userDoc.data().name,
-        ...attendanceDoc.data()
-    });
-});
-
-// --- Start Server ---
+// --- Server Listen ---
 app.listen(PORT, () => {
-    console.log(`🚀 Server running at http://localhost:${PORT}`);
+    console.log(`🎉 Server is running on http://localhost:${PORT}`);
 });
