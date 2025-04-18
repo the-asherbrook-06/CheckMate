@@ -86,13 +86,10 @@ app.post('/api/rfid', async (req, res) => {
             };
         }
 
-        // TODO: check
-        console.log(studentData);
-
         await todayRef.set({
             rollNumber: studentData.rollNumber || 'Unknown',
             dept: studentData.dept || 'Unknown',
-            classroom: studentData.classroom || 'Unknown',
+            classroom: studentData.section || 'Unknown',
             checkedIn: true,
             entryTime: timestamp,
             periods: periodsData
