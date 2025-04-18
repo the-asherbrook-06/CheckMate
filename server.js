@@ -86,14 +86,17 @@ app.post('/api/rfid', async (req, res) => {
             };
         }
 
+        // TODO: check
+        print(studentData);
+
         await todayRef.set({
-            rollNumber: studentData.rollNumber,
-            dept: studentData.dept,
-            classroom: studentData.classroom,
+            rollNumber: studentData.rollNumber || 'Unknown',
+            dept: studentData.dept || 'Unknown',
+            classroom: studentData.classroom || 'Unknown',
             checkedIn: true,
             entryTime: timestamp,
             periods: periodsData
-        });        
+        });                
 
         return res.json({ message: 'entered', name: studentData.name, time: timestamp });
     }
