@@ -87,10 +87,13 @@ app.post('/api/rfid', async (req, res) => {
         }
 
         await todayRef.set({
+            rollNumber: studentData.rollNumber,
+            dept: studentData.dept,
+            classroom: studentData.classroom,
             checkedIn: true,
             entryTime: timestamp,
             periods: periodsData
-        });
+        });        
 
         return res.json({ message: 'entered', name: studentData.name, time: timestamp });
     }
